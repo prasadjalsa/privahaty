@@ -251,6 +251,8 @@ export default function HelpPanel({ open, onClose }: Props) {
               q="What is the QR code for?"
               a="The QR code on the credentials page contains the Room ID and Secret encrypted with AES-256-GCM using a one-time key. Both the key and ciphertext are in the URL fragment so they never reach any server. You can download and share the QR image as an alternative to copying the credentials manually."
             />
+            <Q
+              q="Can I use this on mobile?"
               a="Yes. The app is fully responsive and works in any modern mobile browser."
             />
             <Q
