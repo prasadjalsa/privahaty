@@ -54,7 +54,7 @@ export default function HelpPanel({ open, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 flex-shrink-0">
           <div>
-            <h2 className="text-white font-bold text-lg">Help &amp; Documentation</h2>
+            <h2 className="text-white font-bold text-lg">Help & Documentation</h2>
             <p className="text-gray-500 text-xs mt-0.5">Everything you need to know</p>
           </div>
           <button
