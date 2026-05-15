@@ -78,10 +78,10 @@ export default function HelpPanel({ open, onClose }: Props) {
 
             <p className="text-gray-300 text-xs font-semibold uppercase tracking-wide mb-2">Creating a room</p>
             <Step n={1} text='Click "Create a Room" on the home screen.' />
-            <Step n={2} text="Choose how long until messages are wiped: 10 min, 30 min, or 1 hour." />
+            <Step n={2} text="Choose the message lifetime: 10 min, 30 min, or 1 hour. Each message you send will disappear this long after it was sent." />
             <Step n={3} text="Enter a nickname for yourself." />
-            <Step n={4} text="Click Create Room — you'll receive a Room ID and a Secret. Save both immediately; the secret cannot be recovered after you leave this page." />
-            <Step n={5} text="Share the Room ID and Secret with the people you want to chat with — over a secure channel (e.g. Signal, in person)." />
+            <Step n={4} text="Click Create Room — you'll receive a Room ID, a Secret, and a QR code. Save the Room ID and Secret immediately; they cannot be recovered after you leave this page." />
+            <Step n={5} text="Share the Room ID and Secret — or the QR code — with the people you want to chat with, over a secure channel (e.g. Signal, in person). The QR code contains the credentials encrypted so they are not visible as plain text." />
             <Step n={6} text="Click Enter Room to start chatting." />
 
             <p className="text-gray-300 text-xs font-semibold uppercase tracking-wide mt-4 mb-2">Joining a room</p>
@@ -93,14 +93,16 @@ export default function HelpPanel({ open, onClose }: Props) {
           {/* ── Using the Chat ── */}
           <Section title="Using the Chat">
             <p className="text-gray-400 text-sm mb-3 leading-relaxed">
-              The chat room shows a live countdown timer in the header. When it reaches zero,
-              all messages are wiped automatically and the timer resets — the room stays open.
+              Each message has its own individual countdown. A message sent at 12:00 in a
+              10-minute room disappears at 12:10. A message sent at 12:02 disappears at 12:12.
+              The header timer shows when the oldest visible message is about to expire.
             </p>
             <div className="space-y-2 text-sm text-gray-400">
               <p><span className="text-white font-medium">Send a message:</span> Press Enter or click Send.</p>
               <p><span className="text-white font-medium">New line:</span> Press Shift + Enter.</p>
               <p><span className="text-white font-medium">Character limit:</span> 2,000 characters per message.</p>
-              <p><span className="text-white font-medium">Message history:</span> Last 200 messages are shown.</p>
+              <p><span className="text-white font-medium">Message history:</span> Last 500 messages are loaded.</p>
+              <p><span className="text-white font-medium">Header timer:</span> Counts down to when the next (oldest) message expires — not a room-wide reset.</p>
               <p><span className="text-white font-medium">Returning later:</span> Re-enter the Room ID and Secret to rejoin. Your session resets when you close the tab.</p>
             </div>
           </Section>
@@ -140,12 +142,14 @@ export default function HelpPanel({ open, onClose }: Props) {
               </div>
 
               <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                <p className="text-white font-medium mb-1">Message Wipe</p>
+                <p className="text-white font-medium mb-1">Per-Message Rolling Expiry</p>
                 <p className="text-gray-400 leading-relaxed">
-                  Wipes are triggered client-side. When any active room member's browser detects
-                  the countdown has expired, it batch-deletes all messages from Firestore (in
-                  chunks of 400) and resets the timer. If no one is in the room, the wipe happens
-                  the next time anyone opens it.
+                  Every message carries its own <code className="text-indigo-400 text-xs">expiresAt</code> timestamp,
+                  set to the moment it was sent plus the room's lifetime (e.g. 10 min).
+                  Messages disappear individually — not all at once. The header countdown shows
+                  when the oldest visible message will expire next. Expired messages are
+                  hard-deleted from Firestore in batches by any active room member's browser.
+                  If no one is online, deletion happens the next time anyone opens the room.
                 </p>
               </div>
 
@@ -203,7 +207,7 @@ export default function HelpPanel({ open, onClose }: Props) {
               <ul className="text-yellow-300/80 text-xs space-y-1 list-disc list-inside">
                 <li>The secret is only as safe as how you share it. Use a secure channel (e.g. Signal).</li>
                 <li>Anyone with the secret can read all messages — treat it like a password.</li>
-                <li>Client-side wipe only runs when someone is in the room.</li>
+                <li>Message deletion from Firestore is deferred if no one is in the room — but expired messages are never shown to any client regardless.</li>
                 <li>Messages in transit are protected by HTTPS in addition to E2EE.</li>
               </ul>
             </div>
@@ -216,12 +220,12 @@ export default function HelpPanel({ open, onClose }: Props) {
               a="No. All messages are encrypted with AES-256-GCM before being stored. Firestore only ever holds ciphertext — without the room secret, it is unreadable by anyone including us."
             />
             <Q
-              q="What happens when the timer expires?"
-              a="All messages are permanently deleted from Firestore. The room ID and secret remain valid and the timer resets — you can keep chatting in the same room."
+              q="When does a message disappear?"
+              a="Each message expires individually. A message sent in a 10-minute room disappears exactly 10 minutes after it was sent — regardless of when other messages were sent. The header timer shows when the next (oldest) message will vanish."
             />
             <Q
               q="Can deleted messages be recovered?"
-              a="No. Messages are hard-deleted from Firestore. There are no backups, no archives, and no way to recover them."
+              a="No. Messages are hard-deleted from Firestore as they expire. There are no backups, no archives, and no way to recover them."
             />
             <Q
               q="What happens if I close the tab?"
@@ -236,15 +240,17 @@ export default function HelpPanel({ open, onClose }: Props) {
               a="Yes. There is no uniqueness check on nicknames. It may cause confusion but has no effect on security."
             />
             <Q
-              q="What if nobody is in the room when the timer expires?"
-              a="The wipe is deferred. It will trigger automatically the next time any member opens the room."
+              q="What if nobody is in the room when a message expires?"
+              a="The message is hidden immediately for anyone who joins after the expiry time. The actual Firestore deletion happens the next time any member opens the room — their browser cleans up expired messages automatically on load."
             />
             <Q
               q="Is there a limit on how many rooms I can create?"
               a="There is no enforced limit, but the app runs on Firebase's free Spark plan which has monthly read/write quotas. For personal or small-group use, you are very unlikely to hit them."
             />
             <Q
-              q="Can I use this on mobile?"
+              q="What is the QR code for?"
+              a="The QR code on the credentials page contains the Room ID and Secret encrypted with AES-256-GCM using a one-time key. Both the key and ciphertext are in the URL fragment so they never reach any server. You can download and share the QR image as an alternative to copying the credentials manually."
+            />
               a="Yes. The app is fully responsive and works in any modern mobile browser."
             />
             <Q

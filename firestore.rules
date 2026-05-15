@@ -2,53 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Deny everything by default
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper: is the requesting user a member of this room?
-    // Uses exists() which does not expose document contents.
     function isRoomMember(roomId) {
       return request.auth != null
         && exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid));
     }
 
     match /rooms/{roomId} {
-      // Members can read room metadata (expiryMinutes, nextWipeAt, createdAt)
       allow read: if isRoomMember(roomId);
 
-      // Any authenticated user can create a new room
       allow create: if request.auth != null
-                    && request.resource.data.keys().hasOnly(['expiryMinutes', 'createdAt', 'nextWipeAt'])
+                    && request.resource.data.keys().hasOnly(['expiryMinutes', 'createdAt'])
                     && request.resource.data.expiryMinutes in [10, 30, 60]
-                    && request.resource.data.createdAt == request.time
-                    && request.resource.data.nextWipeAt is timestamp;
+                    && request.resource.data.createdAt == request.time;
 
-      // Members can only update nextWipeAt (client-side wipe resets the timer)
-      allow update: if isRoomMember(roomId)
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nextWipeAt'])
-                    && request.resource.data.nextWipeAt is timestamp;
-
+      // No client updates needed — room doc is immutable after creation
+      allow update: if false;
       allow delete: if false;
 
-      // Secret hash subcollection — write-once on room creation, NEVER readable by clients.
-      // Firestore security rules can still reference this via get() for server-side verification.
       match /_secret/hash {
         allow create: if request.auth != null
                       && request.resource.data.keys().hasOnly(['secretHash'])
                       && request.resource.data.secretHash is string
                       && request.resource.data.secretHash.size() == 64
                       && !exists(/databases/$(database)/documents/rooms/$(roomId)/_secret/hash);
-
-        // Never directly readable or modifiable by any client
         allow read, update, delete: if false;
       }
 
-      // Member docs — prove you know the room secret to join
       match /members/{uid} {
-        // Create your own member doc by providing the correct secretHash.
-        // The rule verifies it server-side against _secret/hash (which clients cannot read).
         allow create: if request.auth != null
                       && request.auth.uid == uid
                       && request.resource.data.keys().hasOnly(['nickname', 'joinedAt', 'secretHash'])
@@ -60,26 +44,24 @@ service cloud.firestore {
                       && get(/databases/$(database)/documents/rooms/$(roomId)/_secret/hash).data.secretHash
                          == request.resource.data.secretHash;
 
-        // Only readable by the member themselves
         allow read: if request.auth != null && request.auth.uid == uid;
         allow update, delete: if false;
       }
 
-      // Messages
       match /messages/{msgId} {
         allow read: if isRoomMember(roomId);
 
-        // Create: must be a member; nickname must match member doc; server timestamp enforced
         allow create: if isRoomMember(roomId)
-                      && request.resource.data.keys().hasOnly(['text', 'nickname', 'createdAt'])
+                      && request.resource.data.keys().hasOnly(['text', 'nickname', 'createdAt', 'expiresAt'])
                       && request.resource.data.text is string
                       && request.resource.data.text.size() > 0
                       && request.resource.data.text.size() <= 2000
                       && request.resource.data.createdAt == request.time
+                      && request.resource.data.expiresAt is timestamp
+                      && request.resource.data.expiresAt > request.time
                       && request.resource.data.nickname
                          == get(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid)).data.nickname;
 
-        // Members can delete messages (needed for client-side batch wipe)
         allow delete: if isRoomMember(roomId);
         allow update: if false;
       }

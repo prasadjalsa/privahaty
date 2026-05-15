@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signInAnonymously } from 'firebase/auth'
-import { doc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import { sha256hex, randomBase64url, randomAlphanum } from '../lib/crypto'
 import RoomCredentials from '../components/RoomCredentials'
@@ -38,15 +38,9 @@ export default function CreatePage() {
       const secret = randomBase64url(16)
       const secretHash = await sha256hex(secret)
 
-      const now = Timestamp.now()
-      const nextWipeAt = Timestamp.fromMillis(now.toMillis() + expiryMinutes * 60 * 1000)
-
-      // Write room metadata, secret hash, and creator's member doc sequentially.
-      // _secret/hash must exist before member doc creation (rules use get() on it).
       await setDoc(doc(db, 'rooms', roomId), {
         expiryMinutes,
         createdAt: serverTimestamp(),
-        nextWipeAt,
       })
 
       await setDoc(doc(db, 'rooms', roomId, '_secret', 'hash'), { secretHash })

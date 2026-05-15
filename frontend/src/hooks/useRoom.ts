@@ -6,9 +6,7 @@ import {
   query,
   orderBy,
   limit,
-  getDocs,
   writeBatch,
-  updateDoc,
   Timestamp,
   DocumentData,
 } from 'firebase/firestore'
@@ -19,91 +17,110 @@ export interface Message {
   text: string
   nickname: string
   createdAt: Timestamp | null
+  expiresAt: Timestamp | null
 }
 
 export interface RoomDoc {
   expiryMinutes: number
-  nextWipeAt: Timestamp
   createdAt: Timestamp
 }
 
-async function wipeRoom(roomId: string, expiryMinutes: number): Promise<void> {
-  const messagesRef = collection(db, 'rooms', roomId, 'messages')
-
-  // Batch-delete all messages in chunks of 400 (under the 500 op limit)
-  let hasMore = true
-  while (hasMore) {
-    const snap = await getDocs(query(messagesRef, limit(400)))
-    if (snap.empty) break
+async function deleteMessages(roomId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  // Process in chunks of 400 (under the 500 op batch limit)
+  for (let i = 0; i < ids.length; i += 400) {
     const batch = writeBatch(db)
-    snap.docs.forEach((d) => batch.delete(d.ref))
+    ids.slice(i, i + 400).forEach((id) =>
+      batch.delete(doc(db, 'rooms', roomId, 'messages', id))
+    )
     await batch.commit()
-    hasMore = snap.size >= 400
   }
-
-  const nextWipeAt = Timestamp.fromMillis(Date.now() + expiryMinutes * 60 * 1000)
-  await updateDoc(doc(db, 'rooms', roomId), { nextWipeAt })
 }
 
 export function useRoom(roomId: string | undefined) {
   const [roomDoc, setRoomDoc] = useState<RoomDoc | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [rawMessages, setRawMessages] = useState<Message[]>([])
+  const [visibleMessages, setVisibleMessages] = useState<Message[]>([])
+  const [nextExpiresAt, setNextExpiresAt] = useState<Timestamp | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  // Track in-progress wipe to avoid concurrent triggers
-  const wipingRef = useRef(false)
+  const deletingRef = useRef<Set<string>>(new Set())
 
+  // Subscribe to Firestore
   useEffect(() => {
     if (!roomId) return
 
     const unsubRoom = onSnapshot(
       doc(db, 'rooms', roomId),
       (snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as RoomDoc
-          setRoomDoc(data)
-
-          // Trigger client-side wipe if the timer has expired
-          if (data.nextWipeAt.toMillis() <= Date.now() && !wipingRef.current) {
-            wipingRef.current = true
-            wipeRoom(roomId, data.expiryMinutes)
-              .catch(console.error)
-              .finally(() => {
-                wipingRef.current = false
-              })
-          }
-        }
+        if (snap.exists()) setRoomDoc(snap.data() as RoomDoc)
         setLoading(false)
       },
-      (err) => {
-        setError(err.message)
-        setLoading(false)
-      }
-    )
-
-    const messagesQuery = query(
-      collection(db, 'rooms', roomId, 'messages'),
-      orderBy('createdAt', 'asc'),
-      limit(200)
+      (err) => { setError(err.message); setLoading(false) }
     )
 
     const unsubMessages = onSnapshot(
-      messagesQuery,
+      query(
+        collection(db, 'rooms', roomId, 'messages'),
+        orderBy('createdAt', 'asc'),
+        limit(500)
+      ),
       (snap) => {
         const msgs: Message[] = snap.docs.map((d: DocumentData) => ({
           id: d.id,
           ...(d.data() as Omit<Message, 'id'>),
         }))
-        setMessages(msgs)
+        setRawMessages(msgs)
       },
       (err) => setError(err.message)
     )
 
-    return () => {
-      unsubRoom()
-      unsubMessages()
-    }
+    return () => { unsubRoom(); unsubMessages() }
   }, [roomId])
 
-  return { roomDoc, messages, loading, error }
+  // Every second: filter out expired messages and delete them from Firestore
+  useEffect(() => {
+    if (!roomId) return
+
+    function tick() {
+      const now = Date.now()
+      const visible: Message[] = []
+      const expiredIds: string[] = []
+
+      for (const msg of rawMessages) {
+        if (msg.expiresAt && msg.expiresAt.toMillis() <= now) {
+          if (!deletingRef.current.has(msg.id)) {
+            expiredIds.push(msg.id)
+            deletingRef.current.add(msg.id)
+          }
+        } else {
+          visible.push(msg)
+        }
+      }
+
+      setVisibleMessages(visible)
+
+      // Earliest expiry among visible messages → drives the countdown timer
+      const earliest = visible.reduce<Timestamp | null>((min, m) => {
+        if (!m.expiresAt) return min
+        if (!min || m.expiresAt.toMillis() < min.toMillis()) return m.expiresAt
+        return min
+      }, null)
+      setNextExpiresAt(earliest)
+
+      if (expiredIds.length > 0) {
+        deleteMessages(roomId, expiredIds)
+          .catch(console.error)
+          .finally(() => {
+            expiredIds.forEach((id) => deletingRef.current.delete(id))
+          })
+      }
+    }
+
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [rawMessages, roomId])
+
+  return { roomDoc, messages: visibleMessages, nextExpiresAt, loading, error }
 }

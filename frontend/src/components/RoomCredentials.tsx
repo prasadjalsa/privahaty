@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import QRCodeDisplay from './QRCodeDisplay'
 
 interface Props {
   roomId: string
@@ -36,7 +37,7 @@ export default function RoomCredentials({ roomId, secret }: Props) {
   const [revealed, setRevealed] = useState(false)
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <CopyField label="Room ID" value={roomId} mono />
 
       <div>
@@ -54,14 +55,19 @@ export default function RoomCredentials({ roomId, secret }: Props) {
             {revealed ? secret : '••••••••••••••••••••••'}
           </span>
           <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(secret)
-            }}
+            onClick={async () => { await navigator.clipboard.writeText(secret) }}
             className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex-shrink-0 transition-colors"
           >
             Copy
           </button>
         </div>
+      </div>
+
+      <div className="border-t border-gray-800 pt-4">
+        <p className="text-gray-400 text-xs mb-3 text-center">
+          Or share via QR code
+        </p>
+        <QRCodeDisplay roomId={roomId} secret={secret} />
       </div>
     </div>
   )

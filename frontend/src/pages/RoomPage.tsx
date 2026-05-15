@@ -12,7 +12,7 @@ export default function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
-  const { roomDoc, messages, loading: roomLoading, error } = useRoom(roomId)
+  const { roomDoc, messages, nextExpiresAt, loading: roomLoading, error } = useRoom(roomId)
   const [authChecked, setAuthChecked] = useState(false)
   const [nickname, setNickname] = useState('')
   const [secret, setSecret] = useState('')
@@ -24,7 +24,6 @@ export default function RoomPage() {
       return
     }
 
-    // Read nickname from the member doc (readable only by the member themselves)
     getDoc(doc(db, 'rooms', roomId, 'members', user.uid))
       .then((snap) => {
         if (!snap.exists()) {
@@ -76,9 +75,7 @@ export default function RoomPage() {
           <p className="text-white font-mono font-medium text-sm">{roomId}</p>
         </div>
 
-        {!roomLoading && roomDoc && (
-          <CountdownTimer nextWipeAt={roomDoc.nextWipeAt} />
-        )}
+        <CountdownTimer nextExpiresAt={nextExpiresAt} />
       </header>
 
       {/* Messages */}
@@ -88,7 +85,12 @@ export default function RoomPage() {
 
       {/* Input */}
       <div className="flex-shrink-0 border-t border-gray-800">
-        <MessageInput roomId={roomId!} nickname={nickname} secret={secret} />
+        <MessageInput
+          roomId={roomId!}
+          nickname={nickname}
+          secret={secret}
+          expiryMinutes={roomDoc?.expiryMinutes ?? 30}
+        />
       </div>
     </div>
   )
