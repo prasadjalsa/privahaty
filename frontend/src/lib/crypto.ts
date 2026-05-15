@@ -47,12 +47,12 @@ export async function decryptQRFragment(
     if (!k || !i || !d) return null
 
     const key = await crypto.subtle.importKey(
-      'raw', fromBase64url(k), { name: 'AES-GCM' }, false, ['decrypt']
+      'raw', fromBase64url(k).buffer as ArrayBuffer, { name: 'AES-GCM' }, false, ['decrypt']
     )
     const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromBase64url(i) },
+      { name: 'AES-GCM', iv: fromBase64url(i).buffer as ArrayBuffer },
       key,
-      fromBase64url(d)
+      fromBase64url(d).buffer as ArrayBuffer
     )
     const { r, s } = JSON.parse(new TextDecoder().decode(plaintext))
     if (typeof r !== 'string' || typeof s !== 'string') return null
