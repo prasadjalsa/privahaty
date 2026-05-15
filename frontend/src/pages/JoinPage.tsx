@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { signInAnonymously } from 'firebase/auth'
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
-import { sha256hex } from '../lib/crypto'
+import { sha256hex, decryptQRFragment } from '../lib/crypto'
 
 export default function JoinPage() {
   const navigate = useNavigate()
@@ -12,6 +12,23 @@ export default function JoinPage() {
   const [nickname, setNickname] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [qrPrefilled, setQrPrefilled] = useState(false)
+
+  // Decrypt QR code credentials from URL fragment if present
+  useEffect(() => {
+    const fragment = window.location.hash
+    if (!fragment || !fragment.includes('k=')) return
+
+    decryptQRFragment(fragment).then((result) => {
+      if (result) {
+        setRoomId(result.roomId)
+        setSecret(result.secret)
+        setQrPrefilled(true)
+        // Clean the fragment from the URL without triggering a navigation
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+    })
+  }, [])
 
   async function handleJoin() {
     const trimmedRoomId = roomId.trim()
@@ -65,6 +82,11 @@ export default function JoinPage() {
         <h2 className="text-2xl font-bold text-white mb-6 text-center">Join a Room</h2>
 
         <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-4">
+          {qrPrefilled && (
+            <div className="bg-indigo-900/30 border border-indigo-700/50 rounded-xl px-4 py-2">
+              <p className="text-indigo-300 text-xs">Room ID and Secret filled from QR code. Enter your nickname to join.</p>
+            </div>
+          )}
           <div>
             <label className="block text-gray-400 text-sm mb-1">Room ID</label>
             <input

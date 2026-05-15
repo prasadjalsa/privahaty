@@ -23,3 +23,38 @@ export function randomAlphanum(length: number): string {
     .map((b) => chars[b % chars.length])
     .join('')
 }
+
+function fromBase64url(b64: string): Uint8Array {
+  const padded = b64.replace(/-/g, '+').replace(/_/g, '/').padEnd(
+    b64.length + ((4 - (b64.length % 4)) % 4), '='
+  )
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
+}
+
+// Decrypts a QR code URL fragment produced by QRCodeDisplay.
+// Fragment format: #k=BASE64URL_KEY&i=BASE64URL_IV&d=BASE64URL_CIPHERTEXT
+export async function decryptQRFragment(
+  fragment: string
+): Promise<{ roomId: string; secret: string } | null> {
+  try {
+    const params = new URLSearchParams(fragment.replace(/^#/, ''))
+    const k = params.get('k')
+    const i = params.get('i')
+    const d = params.get('d')
+    if (!k || !i || !d) return null
+
+    const key = await crypto.subtle.importKey(
+      'raw', fromBase64url(k), { name: 'AES-GCM' }, false, ['decrypt']
+    )
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: fromBase64url(i) },
+      key,
+      fromBase64url(d)
+    )
+    const { r, s } = JSON.parse(new TextDecoder().decode(plaintext))
+    if (typeof r !== 'string' || typeof s !== 'string') return null
+    return { roomId: r, secret: s }
+  } catch {
+    return null
+  }
+}
