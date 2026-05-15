@@ -77,7 +77,7 @@ export default function HelpPanel({ open, onClose }: Props) {
             </p>
 
             <p className="text-gray-300 text-xs font-semibold uppercase tracking-wide mb-2">Creating a room</p>
-            <Step n={1} text="Click "Create a Room" on the home screen." />
+            <Step n={1} text='Click "Create a Room" on the home screen.' />
             <Step n={2} text="Choose how long until messages are wiped: 10 min, 30 min, or 1 hour." />
             <Step n={3} text="Enter a nickname for yourself." />
             <Step n={4} text="Click Create Room — you'll receive a Room ID and a Secret. Save both immediately; the secret cannot be recovered after you leave this page." />
@@ -85,7 +85,7 @@ export default function HelpPanel({ open, onClose }: Props) {
             <Step n={6} text="Click Enter Room to start chatting." />
 
             <p className="text-gray-300 text-xs font-semibold uppercase tracking-wide mt-4 mb-2">Joining a room</p>
-            <Step n={1} text="Click "Join a Room" on the home screen." />
+            <Step n={1} text='Click "Join a Room" on the home screen.' />
             <Step n={2} text="Enter the Room ID, Secret, and your nickname." />
             <Step n={3} text="Click Join Room. You'll be taken directly into the chat." />
           </Section>
