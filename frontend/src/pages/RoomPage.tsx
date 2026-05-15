@@ -15,6 +15,7 @@ export default function RoomPage() {
   const { roomDoc, messages, loading: roomLoading, error } = useRoom(roomId)
   const [authChecked, setAuthChecked] = useState(false)
   const [nickname, setNickname] = useState('')
+  const [secret, setSecret] = useState('')
 
   useEffect(() => {
     if (authLoading) return
@@ -29,7 +30,13 @@ export default function RoomPage() {
         if (!snap.exists()) {
           navigate('/join', { replace: true })
         } else {
+          const storedSecret = sessionStorage.getItem(`secret:${roomId}`)
+          if (!storedSecret) {
+            navigate('/join', { replace: true })
+            return
+          }
           setNickname((snap.data().nickname as string) ?? '')
+          setSecret(storedSecret)
           setAuthChecked(true)
         }
       })
@@ -76,12 +83,12 @@ export default function RoomPage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-hidden">
-        <MessageList messages={messages} loading={roomLoading} myNickname={nickname} />
+        <MessageList messages={messages} loading={roomLoading} myNickname={nickname} secret={secret} roomId={roomId!} />
       </div>
 
       {/* Input */}
       <div className="flex-shrink-0 border-t border-gray-800">
-        <MessageInput roomId={roomId!} nickname={nickname} />
+        <MessageInput roomId={roomId!} nickname={nickname} secret={secret} />
       </div>
     </div>
   )

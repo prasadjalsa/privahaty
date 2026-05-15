@@ -58,6 +58,7 @@ export default function CreatePage() {
       })
 
       setCreated({ roomId, secret })
+      sessionStorage.setItem(`secret:${roomId}`, secret)
       setPhase('credentials')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create room')

@@ -1,15 +1,17 @@
 import { useState, useRef, KeyboardEvent } from 'react'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { encryptMessage } from '../lib/encryption'
 
 interface Props {
   roomId: string
   nickname: string
+  secret: string
 }
 
 const MAX_LENGTH = 2000
 
-export default function MessageInput({ roomId, nickname }: Props) {
+export default function MessageInput({ roomId, nickname, secret }: Props) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -21,7 +23,7 @@ export default function MessageInput({ roomId, nickname }: Props) {
     setSending(true)
     try {
       await addDoc(collection(db, 'rooms', roomId, 'messages'), {
-        text: trimmed,
+        text: await encryptMessage(trimmed, secret, roomId),
         nickname,
         createdAt: serverTimestamp(),
       })

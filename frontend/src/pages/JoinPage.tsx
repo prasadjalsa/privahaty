@@ -45,6 +45,7 @@ export default function JoinPage() {
         secretHash,
       })
 
+      sessionStorage.setItem(`secret:${trimmedRoomId}`, trimmedSecret)
       navigate(`/room/${trimmedRoomId}`)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : ''
