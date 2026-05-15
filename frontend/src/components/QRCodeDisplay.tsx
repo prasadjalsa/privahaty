@@ -30,11 +30,9 @@ async function buildQRPayload(roomId: string, secret: string): Promise<string> {
 
 export default function QRCodeDisplay({ roomId, secret }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
-  const [qrUrl, setQrUrl] = useState<string | null>(null)
 
   useEffect(() => {
     buildQRPayload(roomId, secret).then((url) => {
-      setQrUrl(url)
       QRCode.toDataURL(url, {
         width: 240,
         margin: 2,

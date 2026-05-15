@@ -108,7 +108,7 @@ export function useRoom(roomId: string | undefined) {
       }, null)
       setNextExpiresAt(earliest)
 
-      if (expiredIds.length > 0) {
+      if (expiredIds.length > 0 && roomId) {
         deleteMessages(roomId, expiredIds)
           .catch(console.error)
           .finally(() => {
