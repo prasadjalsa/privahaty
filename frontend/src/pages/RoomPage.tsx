@@ -4,7 +4,6 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../hooks/useAuth'
 import { useRoom } from '../hooks/useRoom'
-import CountdownTimer from '../components/CountdownTimer'
 import MessageList from '../components/MessageList'
 import MessageInput from '../components/MessageInput'
 
@@ -12,7 +11,7 @@ export default function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
-  const { roomDoc, messages, nextExpiresAt, loading: roomLoading, error } = useRoom(roomId)
+  const { roomDoc, messages, loading: roomLoading, error } = useRoom(roomId)
   const [authChecked, setAuthChecked] = useState(false)
   const [nickname, setNickname] = useState('')
   const [secret, setSecret] = useState('')
@@ -69,13 +68,9 @@ export default function RoomPage() {
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <div>
-          <span className="text-gray-500 text-xs">Room</span>
-          <p className="text-white font-mono font-medium text-sm">{roomId}</p>
-        </div>
-
-        <CountdownTimer nextExpiresAt={nextExpiresAt} />
+      <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex-shrink-0">
+        <span className="text-gray-500 text-xs">Room</span>
+        <p className="text-white font-mono font-medium text-sm">{roomId}</p>
       </header>
 
       {/* Messages */}
