@@ -28,7 +28,10 @@ function fromBase64url(b64: string): Uint8Array {
   const padded = b64.replace(/-/g, '+').replace(/_/g, '/').padEnd(
     b64.length + ((4 - (b64.length % 4)) % 4), '='
   )
-  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
+  const str = atob(padded)
+  const buf = new Uint8Array(str.length)
+  for (let j = 0; j < str.length; j++) buf[j] = str.charCodeAt(j)
+  return buf
 }
 
 // Decrypts a QR code URL fragment produced by QRCodeDisplay.
